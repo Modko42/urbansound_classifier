@@ -3,7 +3,7 @@ import os
 os.makedirs("C:/Users/beni1/Desktop/Önlab/spectograms5s_v2_overlap4s/train")
 os.makedirs("C:/Users/beni1/Desktop/Önlab/spectograms5s_v2_overlap4s/test")
 
-genres = 'blues classical country disco hiphop metal pop reggae rock'
+genres = 'air_conditioner car_horn children_playing dog_bark drilling engine_idling gun_shot jackhammer siren street_music'
 genres = genres.split()
 for g in genres:
   path_audio = os.path.join('/content/audio3sec',f'{g}')

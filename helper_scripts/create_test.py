@@ -2,7 +2,7 @@ import os
 import random
 import shutil
 
-genres = 'blues classical country disco hiphop metal pop reggae rock'
+genres = 'air_conditioner car_horn children_playing dog_bark drilling engine_idling gun_shot jackhammer siren street_music'
 genres = genres.split()
 
 directory = "E:/temp_location/train/"
