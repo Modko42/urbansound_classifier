@@ -90,14 +90,14 @@ transform = transforms.Compose([
 
 haveCuda = torch.cuda.is_available()
 
-trainSet = torchvision.datasets.ImageFolder(root="E:/temp_location/train/", transform=transform)
-testSet = torchvision.datasets.ImageFolder(root="E:/temp_location/test/", transform=transform)
+trainSet = torchvision.datasets.ImageFolder(root="/Users/modko42/Desktop/template/spectograms/v5/train/", transform=transform)
+testSet = torchvision.datasets.ImageFolder(root="/Users/modko42/Desktop/template/spectograms/v5/test/", transform=transform)
 trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=128, shuffle=True)
 testLoader = torch.utils.data.DataLoader(testSet, batch_size=128, shuffle=False)
 
 net = NETWORK2()
 print(net)
-summary(net.cuda(), (3, 275, 275))
+summary(net, (3, 256, 256))
 best_train_acc = 0
 best_val_acc = 0
 
