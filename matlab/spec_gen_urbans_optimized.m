@@ -5,7 +5,7 @@ genres = ["air_conditioner","car_horn","children_playing","dog_bark","drilling",
 [audioBG,FsBg] = audioread('/Users/modko42/Desktop/template/downtown_traffic.wav');
 import_location = "/Users/modko42/Desktop/template/classes/";
 training_export_location = "/Users/modko42/Desktop/template/spectograms/";
-version = "v_temp";
+version = "v_7";
 
 generateFolders(training_export_location,version,genres);
 
@@ -34,6 +34,7 @@ for x=1:length(genres)
             S = zeros(round(windowlength/2)+1,round(4*Fs/windowlength));
             C = zeros(209,1);
             ZCR = zeros(209,1);
+            RMS = zeros(209,1);
             k = 1;
             j = 1;
             stepsize = 400;
@@ -71,21 +72,22 @@ for x=1:length(genres)
                   S(:,j) = spect(1:round(windowlength/2)+1);
                   C(j) = customSpectalCentroid(y);
                   ZCR(j) = zerocrossrate(y);
-                  
+                  RMS(j) = rms(y);
                   k = k + windowlength;
                   j = j+1;
             end
             
             SE = pentropy(audioIn,Fs);
+
             name = strcat(training_export_location,version,'/train/',string(genre),'/spec_',num2str(z-2),'.png');
-            customWriteImage(S,C,ZCR,SE,name,50,5000);
+            customWriteImage(S,C,ZCR,SE,RMS,name,50,5000);
             z = z + 1;
             duration = toc;
         end
     end
 end
 
-function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,filepath,bottomFreq,topFreq)
+function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean_square,filepath,bottomFreq,topFreq)
     normalized = normalize(db(S),'range',[0 1]);
     normalized = flip(imresize(normalized,[1251 256]));
     logscaled = zeros(256,256);
@@ -100,8 +102,10 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,filepath,
     spectral_entropy = imresize(spectral_entropy,256/length(spectral_entropy));
     norm_sentropy = normalize(spectral_entropy,'range',[0 1]);
 
-    musical_features = zeros(256,256);
+    root_mean_square = imresize(root_mean_square,256/length(root_mean_square));
+    norm_rms = normalize(root_mean_square,'range',[0 1]);
 
+    musical_features = zeros(256,256);
 
     custom_scale = logspace(log10(bottomFreq/8.82),log10(topFreq/8.82),256);
     log_constant = custom_scale(2) / custom_scale(1);
@@ -120,6 +124,10 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,filepath,
                 else 
                     if row < 3*32+1
                         musical_features(row,col) = norm_sentropy(col);
+                    else 
+                        if row < 4*32+1
+                            musical_features(row,col) = norm_rms(col);
+                        end
                     end
                 end 
             end
