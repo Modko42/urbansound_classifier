@@ -1,17 +1,29 @@
 import os
 import random
 import shutil
+import statistics
+
+import audioread
 
 genres = 'air_conditioner car_horn children_playing dog_bark drilling engine_idling gun_shot jackhammer siren street_music'
 genres = genres.split()
 
-directory = "/Users/modko42/Desktop/template/spectograms/v5/train/"
+directory = "E:/urbandsounds8k/classes/"
 for g in genres:
+  genre_avg = []
   filenames = os.listdir(os.path.join(directory,f"{g}"))
-  #for f in filenames:
-    #random.shuffle(filenames)
-  test_files = filenames[0:round(len(filenames)/10)]
-  print(len(test_files))
-  for f in test_files:
+  for f in filenames:
+    if f.split('.')[-1] == 'wav':
+      with audioread.audio_open(directory + f"{g}"+ "/" + f) as file:
+        genre_avg.append(file.duration)
+      #random.shuffle(filenames)
 
-    shutil.move(directory + f"{g}"+ "/" + f,"/Users/modko42/Desktop/template/spectograms/v5/test/" + f"{g}")
+
+  print(g+'  '+str(round(len(filenames)*0.1)))
+  print(g+'  avg length '+str(round(statistics.mean(genre_avg),2)))
+
+  # test_files = filenames[0:round(len(filenames)*0.1)]
+  #
+  # for f in test_files:
+  #
+  #   shutil.move(directory + f"{g}"+ "/" + f,"E:/temp_location/test/" + f"{g}")

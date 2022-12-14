@@ -197,8 +197,8 @@ fold_results = []
 
 for fold_counter in range(1, 11):
     net = NETWORK2()
-    #print(net)
-    #summary(net.cuda(), (3, 256, 256))
+    print(net)
+    summary(net.cuda(), (3, 256, 256))
 
     if haveCuda:
         torch.cuda.manual_seed(42)
