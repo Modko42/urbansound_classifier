@@ -1,5 +1,5 @@
-genres = ["air_conditioner","car_horn","children_playing","dog_bark","drilling","engine_idling","gun_shot","jackhammer","siren","street_music"];
-%genres = ["car_horn"];
+%genres = ["air_conditioner","car_horn","children_playing","dog_bark","drilling","engine_idling","gun_shot","jackhammer","siren","street_music"];
+genres = ["mixed_audio"];
 
 windows = true;
 separator = '\';

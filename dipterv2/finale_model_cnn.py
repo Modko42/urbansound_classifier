@@ -32,7 +32,10 @@ def progress(value, max=100):
 
 
 print(torch.cuda.is_available())
-
+haveCuda = torch.cuda.is_available()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Using device:', device)
+torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
 class NETWORK2(nn.Module):
     def __init__(self):
@@ -60,7 +63,7 @@ class NETWORK2(nn.Module):
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(p=0.3),
-        )
+        ).cuda()
         # 15488
 
         self.flatten = nn.Flatten()
@@ -90,8 +93,14 @@ transform = transforms.Compose([
     # (0.24703233, 0.24348505, 0.26158768))
 ])
 
-haveCuda = torch.cuda.is_available()
 
+
+def print_gpu_stats():
+    if device.type == 'cuda':
+        print(torch.cuda.get_device_name(0))
+        print('Memory Usage:')
+        print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+        print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
 
 print("Initialization took %.2f seconds." % (time.time() - start_time))
 
@@ -106,15 +115,15 @@ def train(epoch):
     # set the network to train (for batchnorm and dropout)
     net.train()
 
-    # Create progress bar
 
     # Epoch loop
     for i, data in enumerate(trainLoader, 0):
         # get the inputs
         inputs, labels = data
 
+
         if haveCuda:
-            inputs, labels = inputs.cuda(), labels.cuda()
+           inputs, labels = inputs.cuda(), labels.cuda()
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -193,102 +202,69 @@ def val(epoch):
 torch.manual_seed(42)
 
 
-fold_results = []
 
-for fold_counter in range(1, 11):
-    net = NETWORK2()
-    #print(net)
-    #summary(net.cuda(), (3, 256, 256))
 
-    if haveCuda:
-        torch.cuda.manual_seed(42)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+net = NETWORK2()
 
-    # numClass,nFeat,nLevels,layersPerLevel,kernelSize,nLinType,bNorm,residual=False):
-    if haveCuda:
-        net = net.cuda()
-    # Loss, and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
-                          nesterov=True, weight_decay=1e-4)
+if haveCuda:
+    torch.cuda.manual_seed(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    # Create LR cheduler
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, 10)
+# numClass,nFeat,nLevels,layersPerLevel,kernelSize,nLinType,bNorm,residual=False):
+if haveCuda:
+    net = net.cuda()
+# Loss, and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
+                      nesterov=True, weight_decay=1e-4)
 
-    # Epoch counter
-    numEpoch = 32
+# Create LR cheduler
+scheduler = lr_scheduler.CosineAnnealingLR(optimizer, 10)
 
-    trLosses = []
-    trAccs = []
-    valLosses = []
-    valAccs = []
-    best_loss = 10
-    best_train_acc = 0
-    best_val_acc = 0
+# Epoch counter
+numEpoch = 32
 
-    trainSet = torchvision.datasets.ImageFolder(
-        root="E:/temp_location/10fold_cross_val_datasets/" + str(fold_counter) + "/train/", transform=transform)
-    testSet = torchvision.datasets.ImageFolder(
-        root="E:/temp_location/10fold_cross_val_datasets/" + str(fold_counter) + "/test/", transform=transform)
-    trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=32, shuffle=True)
-    testLoader = torch.utils.data.DataLoader(testSet, batch_size=32, shuffle=False)
+trLosses = []
+trAccs = []
+valLosses = []
+valAccs = []
+best_loss = 10
+best_train_acc = 0
+best_val_acc = 0
 
-    print('Started fold ' + str(fold_counter))
+trainSet = torchvision.datasets.ImageFolder(
+    root="E:/temp_location/train/", transform=transform)
+testSet = torchvision.datasets.ImageFolder(
+    root="E:/temp_location/test/", transform=transform)
 
-    for epoch in range(numEpoch):
-        # Call train and val
-        tr_loss, tr_corr = train(epoch)
-        val_loss, val_corr = val(epoch)
+trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=64, shuffle=True,generator=torch.Generator(device='cuda'))
+testLoader = torch.utils.data.DataLoader(testSet, batch_size=64, shuffle=False,generator=torch.Generator(device='cuda'))
 
-        trLosses.append(tr_loss)
-        trAccs.append(tr_corr)
-        valLosses.append(val_loss)
-        valAccs.append(val_corr)
+print_gpu_stats()
+for epoch in range(numEpoch):
+    # Call train and val
+    tr_loss, tr_corr = train(epoch)
+    val_loss, val_corr = val(epoch)
 
-        print("Epoch "+str(epoch+1)+" val acc: "+str(val_corr))
 
-        if val_loss < best_loss:
-            best_loss = val_loss
-            torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_"
-                       + str(datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
-        # Step with the scheduler
-        scheduler.step()
+    trLosses.append(tr_loss)
+    trAccs.append(tr_corr)
+    valLosses.append(val_loss)
+    valAccs.append(val_corr)
 
-    # Finished
-    print('Finished fold ' + str(fold_counter))
-    print("Best training accuracy: %.2f" % (best_train_acc))
-    print("Best validation accuracy: %.2f" % (best_val_acc))
-    print("Avg train time: %.2f" % (sum(train_times) / len(train_times)))
-    print("Avg val time  : %.2f" % (sum(val_times) / len(val_times)))
-    print("Total duration: %.2f" % (time.time() - start_time))
+    print("Epoch "+str(epoch+1)+": \ntrain acc: "+str(tr_corr)+"\nval acc: "+str(val_corr))
 
-    fold_results.append(best_val_acc)
+    if val_loss < best_loss:
+        best_loss = val_loss
+        torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_"
+                   + str(datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
+    # Step with the scheduler
+    scheduler.step()
 
-    print("Average validation accuracy so far: " + str(statistics.mean(fold_results)))
-
-    net.eval()
-
-for i in range(0, 10):
-    print("Fold " + str(i) + " result: " + str(fold_results[i]))
-print("Finished training, average validation accuracy: " + str(statistics.mean(fold_results)))
-
-conf = torch.zeros(10, 10)
-
-for i, data in enumerate(testLoader, 0):
-    # get the inputs
-    inputs, labels = data
-
-    # Convert to cuda conditionally
-    if haveCuda:
-        inputs, labels = inputs.cuda(), labels.cuda()
-
-    # forward
-    outputs = net(inputs)
-
-    # compute statistics
-    _, predicted = torch.max(outputs, 1)
-    for label, pred in zip(labels, predicted):
-        conf[label, pred] += 1
-
-print(conf)
+# Finished
+print("Best training accuracy: %.2f" % (best_train_acc))
+print("Best validation accuracy: %.2f" % (best_val_acc))
+print("Avg train time: %.2f" % (sum(train_times) / len(train_times)))
+print("Avg val time  : %.2f" % (sum(val_times) / len(val_times)))
+print("Total duration: %.2f" % (time.time() - start_time))

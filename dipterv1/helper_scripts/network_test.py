@@ -58,17 +58,13 @@ class NETWORK2(nn.Module):
 
 
 
-net = torch.load("Z:/Egyetem/önlab2_msc/saved_models/model_20220316_1626.pth")
+net = torch.load("Z:/Egyetem/önlab2_msc/saved_models/model_20230315_1958.pth")
 
 import torchvision
 import torchvision.transforms as transforms
 
 transform = transforms.Compose([
     transforms.ToTensor()
-    # transforms.Resize([256,256])
-    # transforms.RandomCrop([288,50])
-    # transforms.Normalize((0.49139968, 0.48215827, 0.44653124),
-    # (0.24703233, 0.24348505, 0.26158768))
 ])
 
 haveCuda = torch.cuda.is_available()
@@ -83,8 +79,7 @@ def image_loader(loader, image_name):
     return image
 
 data_transforms = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.CenterCrop([369, 375])
+    transforms.ToTensor()
 ])
 
 
