@@ -35,29 +35,23 @@ class NETWORK2(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(p=0.3),
         ).cuda()
-        # 15488
 
         self.flatten = nn.Flatten()
         self.pooling = nn.AdaptiveAvgPool2d(1)
         self.linear_layers = nn.Linear(128, 10)
-        # 1936
-        # self.classifier = nn.Conv2d(15488, 9, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
 
-    # Defining the forward pass
     def forward(self, x):
         x = self.cnn_layers(x)
-        # x = x.view(x.size(0), -1)
         x = self.pooling(x)
         x = self.flatten(x)
         x = self.linear_layers(x)
-        # x = self.classifier(x)
+        x = self.sigmoid(x)
         return x
 
 
+net = torch.load("Z:/Egyetem/önlab2_msc/saved_models/model_20230329_2332.pth")
 
-net = torch.load("Z:/Egyetem/önlab2_msc/saved_models/model_20230315_1958.pth")
-
-import torchvision
 import torchvision.transforms as transforms
 
 transform = transforms.Compose([
@@ -87,17 +81,28 @@ def get_classes(indexes,classes):
         result += classes[i]+" "
     return result
 
-test_directory = "E:/urbandsounds8k/spectograms/v25_4_sound_features_50_10000noBGnoise/train/mixed_audio/"
-filenames = os.listdir(test_directory)
 
-for f in filenames:
-
-    image = image_loader(transform,os.path.join(test_directory,f))
-    image = image.cuda()
-    output = net(image)
+test_directory = "E:/temp_location/test/"
 
 
-    _ , predictions = torch.topk(output,k=4,dim=1)
-    predictions = predictions.cpu().detach().numpy()
-    print(f.ljust(20,' ')," | ",get_classes(predictions.squeeze(0).tolist(),classes))
+for current_class in classes:
+    guessed_first = 0
+    current_test_directory = test_directory + current_class + "/"
+    filenames = os.listdir(current_test_directory)
+    for f in filenames:
+
+        image = image_loader(transform,os.path.join(current_test_directory,f))
+        image = image.cuda()
+        output = net(image)
+        #temp = output.tolist()
+        #temp = list(np.around(np.array(temp),2))
+        #print(temp)
+
+
+        _ , predictions = torch.topk(output,k=3,dim=1)
+        predictions = predictions.cpu().detach().numpy()
+        if get_classes(predictions.squeeze(0).tolist(),classes).split(' ')[0] == current_class:
+            guessed_first += 1
+        #print(f.ljust(20,' ')," | ",get_classes(predictions.squeeze(0).tolist(),classes))
+    print(current_class+" - "+str(guessed_first/len(filenames)*100))
 

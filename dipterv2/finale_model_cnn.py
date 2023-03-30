@@ -1,18 +1,15 @@
-import statistics
-
+import pandas as pd
 import torch
 import torchvision
 import torchvision.transforms as transforms
 import torch.nn as nn
-from torchsummary import summary
+import torch.nn.functional as fun
 import time
 import torch.optim as optim
 from torch.optim import lr_scheduler
 import datetime
 
-import matplotlib.pyplot as plt
-
-from IPython.display import HTML, display
+from IPython.display import HTML
 
 start_time = time.time()
 train_times = []
@@ -36,6 +33,7 @@ haveCuda = torch.cuda.is_available()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
 
 class NETWORK2(nn.Module):
     def __init__(self):
@@ -64,145 +62,174 @@ class NETWORK2(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(p=0.3),
         ).cuda()
-        # 15488
 
         self.flatten = nn.Flatten()
         self.pooling = nn.AdaptiveAvgPool2d(1)
         self.linear_layers = nn.Linear(128, 10)
-        # 1936
-        # self.classifier = nn.Conv2d(15488, 9, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
 
-    # Defining the forward pass
     def forward(self, x):
         x = self.cnn_layers(x)
-        # x = x.view(x.size(0), -1)
         x = self.pooling(x)
         x = self.flatten(x)
         x = self.linear_layers(x)
-        # x = self.classifier(x)
+        x = self.sigmoid(x)
         return x
 
 
 transform = transforms.Compose([
     transforms.ToTensor()
-    # transforms.CenterCrop([369, 375])
-    # ,
-    # transforms.Resize([256,256])
-    # transforms.RandomCrop([288,50])
-    # transforms.Normalize((0.49139968, 0.48215827, 0.44653124),
-    # (0.24703233, 0.24348505, 0.26158768))
-])
 
+])
 
 
 def print_gpu_stats():
     if device.type == 'cuda':
         print(torch.cuda.get_device_name(0))
         print('Memory Usage:')
-        print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-        print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+        print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+        print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+
+
+label_translator = [
+    [0],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [0, 4],
+    [0, 5],
+    [0, 6],
+    [0, 7],
+    [0, 8],
+    [0, 9],
+    [1],
+    [1, 2],
+    [1, 3],
+    [1, 4],
+    [1, 5],
+    [1, 6],
+    [1, 7],
+    [1, 8],
+    [1, 9],
+    [2],
+    [2, 3],
+    [2, 4],
+    [2, 5],
+    [2, 6],
+    [2, 7],
+    [2, 8],
+    [2, 9],
+    [3],
+    [3, 4],
+    [3, 5],
+    [3, 6],
+    [3, 7],
+    [3, 8],
+    [3, 9],
+    [4],
+    [4, 5],
+    [4, 6],
+    [4, 7],
+    [4, 8],
+    [4, 9],
+    [5],
+    [5, 6],
+    [5, 7],
+    [5, 8],
+    [5, 9],
+    [6],
+    [6, 7],
+    [6, 8],
+    [6, 9],
+    [7],
+    [7, 8],
+    [7, 9],
+    [8],
+    [8, 9],
+    [9]
+]
+
+def multihot_encoder(labels, dtype=torch.float32):
+    second_stage_labels = []
+    #print("\nOriginal labels:")
+    for l in labels:
+        #print(l,end='')
+        second_stage_labels.append(label_translator[l])
+    #print("\nSecond stage labels:")
+    labels = []
+    for l2 in second_stage_labels:
+        #print(l2,end='')
+        labels.append(l2)
+
+
+    #[14,5,34,3]
+    #[[1,2],[5],[4,6],[3]]
+    #[0,1,1,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,0,0,0]
+    label_set = {0,1,2,3,4,5,6,7,8,9}
+
+    multihot_vectors = []
+    for label_list in labels:
+        multihot_vectors.append([1 if x in label_list else 0 for x in label_set])
+
+    #print("\nThird stage labels:")
+    #for l3 in multihot_vectors[:5]:
+        #print(l3,end='')
+
+    return torch.Tensor(multihot_vectors).to(dtype)
 
 print("Initialization took %.2f seconds." % (time.time() - start_time))
 
 
-def train(epoch):
-    # variables for loss
+def train():
     running_loss = 0.0
-    correct = 0.0
-    total = 0
-    train_start_time = time.time()
-
-    # set the network to train (for batchnorm and dropout)
     net.train()
 
+    for data in trainLoader:
 
-    # Epoch loop
-    for i, data in enumerate(trainLoader, 0):
-        # get the inputs
         inputs, labels = data
-
-
+        new_labels = multihot_encoder(labels)
         if haveCuda:
-           inputs, labels = inputs.cuda(), labels.cuda()
-
-        # zero the parameter gradients
+            inputs, new_labels = inputs.cuda(), new_labels.cuda()
         optimizer.zero_grad()
-
-        # forward + backward + optimize
         outputs = net(inputs)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, new_labels.type(torch.float))
         loss.backward()
         optimizer.step()
-
-        # compute statistics
         running_loss += loss.item()
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
 
-        # Update progress bar
-
-    # print and plot statistics
     tr_loss = running_loss / len(trainLoader)
-    tr_corr = correct / total * 100
-    train_time = time.time() - train_start_time
-    train_times.append(train_time)
-    global best_train_acc
-    if tr_corr > best_train_acc:
-        best_train_acc = tr_corr
+    global best_train_loss
+    if tr_loss < best_train_loss:
+        best_train_loss = tr_loss
 
-    return tr_loss, tr_corr
+    return tr_loss
 
 
-def val(epoch):
-    # variables for loss
+def val():
     running_loss = 0.0
-    correct = 0.0
-    total = 0
-    val_start_time = time.time()
-
-    # set the network to eval (for batchnorm and dropout)
     net.eval()
 
-    # Create progress bar
-
-    # Epoch loop
-    for i, data in enumerate(testLoader, 0):
-        # get the inputs
+    for data in testLoader:
         inputs, labels = data
-
+        new_labels = multihot_encoder(labels)
         if haveCuda:
-            inputs, labels = inputs.cuda(), labels.cuda()
-
-        # forward
+            inputs, new_labels = inputs.cuda(), new_labels.cuda()
         outputs = net(inputs)
-        loss = criterion(outputs, labels)
-
-        # compute statistics
+        loss = criterion(outputs, new_labels.type(torch.float))
         running_loss += loss.item()
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
 
-        # Update progress bar
-
-    # print and plot statistics
     val_loss = running_loss / len(testLoader)
-    val_corr = correct / total * 100
-    val_time = time.time() - val_start_time
-    val_times.append(val_time)
-    global best_val_acc
-    if val_corr > best_val_acc:
-        best_val_acc = val_corr
 
-    return val_loss, val_corr
+    global best_val_loss
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_" + str(
+            datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
+
+    return val_loss
 
 
-# Makes multiple runs comparable
 torch.manual_seed(42)
-
-
-
 
 net = NETWORK2()
 
@@ -211,60 +238,35 @@ if haveCuda:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# numClass,nFeat,nLevels,layersPerLevel,kernelSize,nLinType,bNorm,residual=False):
 if haveCuda:
     net = net.cuda()
-# Loss, and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
-                      nesterov=True, weight_decay=1e-4)
 
-# Create LR cheduler
+criterion = nn.BCELoss()
+optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=1e-4)
+
 scheduler = lr_scheduler.CosineAnnealingLR(optimizer, 10)
 
-# Epoch counter
 numEpoch = 32
-
 trLosses = []
-trAccs = []
 valLosses = []
-valAccs = []
-best_loss = 10
-best_train_acc = 0
-best_val_acc = 0
+best_train_loss = 10
+best_val_loss = 10
 
-trainSet = torchvision.datasets.ImageFolder(
-    root="E:/temp_location/train/", transform=transform)
-testSet = torchvision.datasets.ImageFolder(
-    root="E:/temp_location/test/", transform=transform)
+trainSet = torchvision.datasets.ImageFolder(root="E:/temp_location/train/", transform=transform)
+testSet = torchvision.datasets.ImageFolder(root="E:/temp_location/test/", transform=transform)
 
-trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=64, shuffle=True,generator=torch.Generator(device='cuda'))
-testLoader = torch.utils.data.DataLoader(testSet, batch_size=64, shuffle=False,generator=torch.Generator(device='cuda'))
+trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=64, shuffle=True,
+                                          generator=torch.Generator(device='cuda'))
+testLoader = torch.utils.data.DataLoader(testSet, batch_size=64, shuffle=False,
+                                         generator=torch.Generator(device='cuda'))
 
 print_gpu_stats()
 for epoch in range(numEpoch):
-    # Call train and val
-    tr_loss, tr_corr = train(epoch)
-    val_loss, val_corr = val(epoch)
-
+    tr_loss = train()
+    val_loss = val()
 
     trLosses.append(tr_loss)
-    trAccs.append(tr_corr)
     valLosses.append(val_loss)
-    valAccs.append(val_corr)
 
-    print("Epoch "+str(epoch+1)+": \ntrain acc: "+str(tr_corr)+"\nval acc: "+str(val_corr))
-
-    if val_loss < best_loss:
-        best_loss = val_loss
-        torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_"
-                   + str(datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
-    # Step with the scheduler
+    print("Epoch " + str(epoch + 1) + ": \ntrain loss: " + str(tr_loss) + "\nval loss: " + str(val_loss))
     scheduler.step()
-
-# Finished
-print("Best training accuracy: %.2f" % (best_train_acc))
-print("Best validation accuracy: %.2f" % (best_val_acc))
-print("Avg train time: %.2f" % (sum(train_times) / len(train_times)))
-print("Avg val time  : %.2f" % (sum(val_times) / len(val_times)))
-print("Total duration: %.2f" % (time.time() - start_time))
