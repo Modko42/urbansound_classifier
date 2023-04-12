@@ -14,7 +14,7 @@ genres
 
 [audioBG,FsBg] = audioread("E:\urbandsounds8k\downtown_traffic.wav");
 import_location = "E:\temp_location\mixed_test_audio\";
-training_export_location = "E:\temp_location\mixed_test_data\";
+training_export_location = "E:\temp_location\mixed_test_data_v2\";
 separator = '\';
 
 upper_freq_limit = 10000;
@@ -80,7 +80,7 @@ for x=1:length(genres)
                   k = k + windowlength;
                   j = j+1;
             end
-            %SE = pentropy(audioIn,Fs);
+            SE = pentropy(audioIn,Fs);
 
             splitted_name = split(Files(z).name,'.');
             name = strcat(training_export_location,string(genre),separator,splitted_name(1),'.png');
@@ -94,7 +94,7 @@ end
 function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean_square,filepath,bottomFreq,topFreq,df)
     normalized = normalize(db(S),'range',[0 1]);
     normalized = imresize(normalized,[1251 256]);
-    %inv_normalized = flip(imresize(normalized,[1251 256]));
+    inv_normalized = flip(imresize(normalized,[1251 256]));
     logscaled = zeros(256,256,2);
         
     centroid = imresize(centroid,256/length(centroid));
@@ -103,8 +103,8 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
     zerocrossingrate = imresize(zerocrossingrate,256/length(zerocrossingrate));
     norm_zerocrossingrate = normalize(zerocrossingrate,'range',[0 1]);
 
-    %spectral_entropy = imresize(spectral_entropy,256/length(spectral_entropy));
-    %norm_sentropy = normalize(spectral_entropy,'range',[0 1]);
+    spectral_entropy = imresize(spectral_entropy,256/length(spectral_entropy));
+    norm_sentropy = normalize(spectral_entropy,'range',[0 1]);
 
     root_mean_square = imresize(root_mean_square,256/length(root_mean_square));
     norm_rms = normalize(root_mean_square,'range',[0 1]);
@@ -119,7 +119,7 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
         end_bucket = round(sqrt(log_constant)*custom_scale(row)/df);
         for col=1:size(logscaled,2)   
             logscaled(row,col,1) = mean(normalized(start_bucket:end_bucket,col));
-            %logscaled(row,col,2) = mean(inv_normalized(start_bucket:end_bucket,col));
+            logscaled(row,col,2) = mean(inv_normalized(start_bucket:end_bucket,col));
             
            if row < 1*32+1
                musical_features(row,col) = norm_centroid(col);
@@ -128,7 +128,7 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
                     musical_features(row,col) = norm_zerocrossingrate(col);
                 else 
                     if row < 3*32+1
-                        %musical_features(row,col) = norm_sentropy(col);
+                        musical_features(row,col) = norm_sentropy(col);
                     else 
                         if row < 4*32+1
                             musical_features(row,col) = norm_rms(col);
@@ -141,7 +141,7 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
 
     rgb_img = zeros(256,256,3);
     rgb_img(:,:,1) = flip(logscaled(:,:,1));
-    %rgb_img(:,:,2) = flip(logscaled(:,:,2));
+    rgb_img(:,:,2) = flip(logscaled(:,:,2));
     rgb_img(:,:,3) = musical_features;
     
     imwrite(rgb_img,filepath);

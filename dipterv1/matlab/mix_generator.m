@@ -1,6 +1,6 @@
 classes = ["air_conditioner","car_horn","children_playing","dog_bark","drilling","engine_idling","gun_shot","jackhammer","siren","street_music"];
-source_location = "E:\urbandsounds8k\classes_for_mixing\test\";
-export_folder = "E:\temp_location\mixed_test\";
+source_location = "E:\urbandsounds8k\classes_for_mixing\train\";
+export_folder = "E:\temp_location\mixed_train_audio_v2\";
 for first_class=1:length(classes)
     for second_class=first_class:length(classes)
         if first_class ~= second_class
@@ -9,7 +9,7 @@ for first_class=1:length(classes)
 
             second_path = strcat(source_location,classes(second_class),'\');
             second_directory = dir(second_path);
-            for counter=1:100
+            for counter=1:200
                 first_file = randi([3,length(first_directory)],1);
                 [filepath1,name1,ext1] = fileparts(strcat(first_path,first_directory(first_file).name));
                 while ext1 ~= ".wav"
