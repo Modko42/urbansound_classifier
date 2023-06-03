@@ -41,7 +41,15 @@ class NETWORK2(nn.Module):
         super(NETWORK2, self).__init__()
 
         self.cnn_layers = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(3, 8, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2),
@@ -53,24 +61,10 @@ class NETWORK2(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            #nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
-            #nn.BatchNorm2d(512),
-            #nn.ReLU(True),
-            #nn.MaxPool2d(kernel_size=2, stride=2),
-            #nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1),
-            #nn.BatchNorm2d(1024),
-            #nn.ReLU(True),
-            #nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(p=0.6),
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(256, 128),
-            nn.ReLU(True),
-            nn.Dropout(0.5),
-            nn.Linear(128,10),
+            nn.Linear(128, 10),
             nn.Sigmoid()
         ).cuda()
 
@@ -150,33 +144,34 @@ label_translator = [
     [9]
 ]
 
+
 def multihot_encoder(labels, dtype=torch.float32):
     second_stage_labels = []
-    #print("\nOriginal labels:")
+    # print("\nOriginal labels:")
     for l in labels:
-        #print(l,end='')
+        # print(l,end='')
         second_stage_labels.append(label_translator[l])
-    #print("\nSecond stage labels:")
+    # print("\nSecond stage labels:")
     labels = []
     for l2 in second_stage_labels:
-        #print(l2,end='')
+        # print(l2,end='')
         labels.append(l2)
 
-
-    #[14,5,34,3]
-    #[[1,2],[5],[4,6],[3]]
-    #[0,1,1,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,0,0,0]
-    label_set = {0,1,2,3,4,5,6,7,8,9}
+    # [14,5,34,3]
+    # [[1,2],[5],[4,6],[3]]
+    # [0,1,1,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,0,0,0]
+    label_set = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
     multihot_vectors = []
     for label_list in labels:
         multihot_vectors.append([1 if x in label_list else 0 for x in label_set])
 
-    #print("\nThird stage labels:")
-    #for l3 in multihot_vectors[:5]:
-        #print(l3,end='')
+    # print("\nThird stage labels:")
+    # for l3 in multihot_vectors[:5]:
+    # print(l3,end='')
 
     return torch.Tensor(multihot_vectors).to(dtype)
+
 
 print("Initialization took %.2f seconds." % (time.time() - start_time))
 
@@ -208,7 +203,10 @@ def train():
 
 
 def val():
+
     running_loss = 0.0
+    correct = 0.0
+    total = 0.0
     net.eval()
 
     for data in testLoader:
@@ -220,22 +218,30 @@ def val():
         loss = criterion(outputs, new_labels.type(torch.float))
         running_loss += loss.item()
 
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += predicted.eq(labels).sum().item()
+
+
     val_loss = running_loss / len(testLoader)
+
+    val_corr = correct / total * 100
 
     global best_val_loss
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_" + str(
-            datetime.datetime.now().strftime("%Y%m%d_%H%M"))+"_"+ str(round(val_loss,3)) +"_"+str(epoch)+"batchsize"+str(batchsize_)+ ".pth")
+            datetime.datetime.now().strftime("%Y%m%d_%H%M")) + "_" + str(round(val_loss, 3)) + "_" + str(
+            epoch) + "batchsize" + str(batchsize_) + ".pth")
 
-    return val_loss
+    return val_loss,val_corr
 
 
 torch.manual_seed(42)
 
 net = NETWORK2()
 
-summary(net,input_size=(3,256,256))
+summary(net, input_size=(3, 256, 256))
 
 if haveCuda:
     torch.cuda.manual_seed(42)
@@ -256,8 +262,8 @@ valLosses = []
 best_train_loss = 10
 best_val_loss = 10
 batchsize_ = 64
-trainSet = torchvision.datasets.ImageFolder(root="C:/Users/beni1/Desktop/temp_location/train/", transform=transform)
-testSet = torchvision.datasets.ImageFolder(root="C:/Users/beni1/Desktop/temp_location/test/", transform=transform)
+trainSet = torchvision.datasets.ImageFolder(root="E:/temp_location/original_temp_location/train/", transform=transform)
+testSet = torchvision.datasets.ImageFolder(root="E:/temp_location/original_temp_location/test/", transform=transform)
 
 trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=batchsize_, shuffle=True,
                                           generator=torch.Generator(device='cuda'))
@@ -268,7 +274,7 @@ print_gpu_stats()
 for epoch in range(numEpoch):
     start = time.time()
     tr_loss = train()
-    val_loss = val()
+    val_loss, correct_percentage = val()
 
     trLosses.append(tr_loss)
     valLosses.append(val_loss)
@@ -276,6 +282,6 @@ for epoch in range(numEpoch):
     print("Epoch " + str(epoch + 1) + ": \ntrain loss: " + str(tr_loss) + "\nval loss: " + str(val_loss))
     scheduler.step()
     end = time.time()
-    print("Epoch " + str(epoch + 1)+ " finished in "+str(end-start)+" seconds.")
+    print("Epoch " + str(epoch + 1) + " finished in " + str(end - start) + " seconds.")
 
-print("Best validation loss: "+str(best_val_loss))
+print("Best validation loss: " + str(best_val_loss))

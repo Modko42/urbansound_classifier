@@ -52,6 +52,7 @@ class NETWORK2(nn.Module):
 
 net = torch.load("Z:/Egyetem/önlab2_msc/saved_models/model_20230329_2332.pth")
 
+
 import torchvision.transforms as transforms
 
 transform = transforms.Compose([

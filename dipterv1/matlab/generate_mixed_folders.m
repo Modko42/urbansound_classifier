@@ -1,5 +1,5 @@
 classes = ["air_conditioner","car_horn","children_playing","dog_bark","drilling","engine_idling","gun_shot","jackhammer","siren","street_music"];
-parent_folder = "E:\temp_location\mixed_test_data_v2\";
+parent_folder = "E:\temp_location\mixed_train_data_v3\";
 already_created_combos = [];
 
 all_classes = classes;

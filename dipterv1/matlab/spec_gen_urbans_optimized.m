@@ -1,5 +1,7 @@
+rng(1)
+
 genres = ["air_conditioner","car_horn","children_playing","dog_bark","drilling","engine_idling","gun_shot","jackhammer","siren","street_music"];
-%genres = ["mixed_audio"];
+%genres = ["car_horn"];
 
 windows = true;
 separator = '\';
@@ -19,8 +21,9 @@ end
 upper_freq_limit = 10000;
 lower_freq_limit = 50;
 
-version = "v26_4_sound_features_"+lower_freq_limit+"_"+upper_freq_limit+"noBGnoise";
 
+%version = "v31_4_sound_features_"+lower_freq_limit+"_"+upper_freq_limit+"noBGnoise_withInvSpec_seed0";
+version = "v34_nofeautures_randomshiftingandbgnoiseadded_minus3db";
 generateFolders(training_export_location,version,genres,separator);
 
 [bL,aL] = butter(2,4000/(22050/2));
@@ -46,9 +49,9 @@ for x=1:length(genres)
             window = hamming(windowlength);
             df = Fs / windowlength;
             S = zeros(round(windowlength/2)+1,round(4*Fs/windowlength));
-            C = zeros(209,1);
-            ZCR = zeros(209,1);
-            RMS = zeros(209,1);
+            %C = zeros(209,1);
+            %ZCR = zeros(209,1);
+            %RMS = zeros(209,1);
             k = 1;
             j = 1;
             stepsize = floor((4*Fs-2500)/256);
@@ -59,16 +62,24 @@ for x=1:length(genres)
                random_offset_in_steps = floor(((4*Fs - sizeofAudio)) * rand() / windowlength);
                random_start_position = round((100 + rand() * 2000)*Fs);
             end
-            %padded_audio = audioBG(1+random_start_position:random_start_position+4*Fs);
-            %loudness_difference = 1+rand()*2;%acousticLoudness(audioIn,Fs) / acousticLoudness(padded_audio,FsBg);
-            %padded_audio = loudness_difference * padded_audio;
-            padded_audio = zeros(4*Fs,1);
-            padded_audio(1+random_offset_in_steps*stepsize:random_offset_in_steps*stepsize+sizeofAudio) = audioIn;
-            %padded_audio(1:sizeofAudio) = audioIn;
+
+            gainFactor = 10^(-3/20);
+            
+            padded_audio = audioBG(1+random_start_position:random_start_position+4*Fs);
+            
+            padded_audio = gainFactor * padded_audio;
+
+            for s=1:sizeofAudio
+               padded_audio(random_offset_in_steps*stepsize+s) = audioIn(s);
+            end
+
+         
             audioIn = padded_audio;
+
+            
+
             sizeofAudio = 4*Fs;
      
-            %disp(z+" spec "+random_offset_in_steps+" offset, bg noise x"+loudness_difference+" render time: "+duration)
             disp(z+" spec "+random_offset_in_steps+" offset"+" render time: "+duration)
 
             while k < sizeofAudio-windowlength-2
@@ -86,8 +97,8 @@ for x=1:length(genres)
                   k = k + windowlength;
                   j = j+1;
             end
-            SE = pentropy(audioIn,Fs);
-
+            %SE = pentropy(audioIn,Fs);
+            SE = 0;
             splitted_name = split(Files(z).name,'.');
             name = strcat(training_export_location,version,separator,'train',separator,string(genre),separator,splitted_name(1),'.png');
             customWriteImage(S,C,ZCR,SE,RMS,name,lower_freq_limit,upper_freq_limit,df);
@@ -100,22 +111,22 @@ end
 function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean_square,filepath,bottomFreq,topFreq,df)
     normalized = normalize(db(S),'range',[0 1]);
     normalized = imresize(normalized,[1251 256]);
-    inv_normalized = flip(imresize(normalized,[1251 256]));
+    %inv_normalized = flip(imresize(normalized,[1251 256]));
     logscaled = zeros(256,256,2);
         
-    centroid = imresize(centroid,256/length(centroid));
-    norm_centroid = normalize(centroid,'range',[0 1]);
+    %centroid = imresize(centroid,256/length(centroid));
+    %norm_centroid = normalize(centroid,'range',[0 1]);
 
-    zerocrossingrate = imresize(zerocrossingrate,256/length(zerocrossingrate));
-    norm_zerocrossingrate = normalize(zerocrossingrate,'range',[0 1]);
+    %zerocrossingrate = imresize(zerocrossingrate,256/length(zerocrossingrate));
+    %norm_zerocrossingrate = normalize(zerocrossingrate,'range',[0 1]);
 
-    spectral_entropy = imresize(spectral_entropy,256/length(spectral_entropy));
-    norm_sentropy = normalize(spectral_entropy,'range',[0 1]);
+    %spectral_entropy = imresize(spectral_entropy,256/length(spectral_entropy));
+    %norm_sentropy = normalize(spectral_entropy,'range',[0 1]);
 
-    root_mean_square = imresize(root_mean_square,256/length(root_mean_square));
-    norm_rms = normalize(root_mean_square,'range',[0 1]);
+    %root_mean_square = imresize(root_mean_square,256/length(root_mean_square));
+    %norm_rms = normalize(root_mean_square,'range',[0 1]);
 
-    musical_features = zeros(256,256);
+    %musical_features = zeros(256,256);
 
     custom_scale = logspace(log10(bottomFreq),log10(topFreq),256);
     log_constant = custom_scale(2) / custom_scale(1);
@@ -125,19 +136,19 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
         end_bucket = round(sqrt(log_constant)*custom_scale(row)/df);
         for col=1:size(logscaled,2)   
             logscaled(row,col,1) = mean(normalized(start_bucket:end_bucket,col));
-            logscaled(row,col,2) = mean(inv_normalized(start_bucket:end_bucket,col));
+            %logscaled(row,col,2) = mean(inv_normalized(start_bucket:end_bucket,col));
             
            if row < 1*32+1
-               musical_features(row,col) = norm_centroid(col);
+               %musical_features(row,col) = norm_centroid(col);
             else 
                if row < 2*32+1
-                    musical_features(row,col) = norm_zerocrossingrate(col);
+                    %musical_features(row,col) = norm_zerocrossingrate(col);
                 else 
                     if row < 3*32+1
-                        musical_features(row,col) = norm_sentropy(col);
+                        %musical_features(row,col) = norm_sentropy(col);
                     else 
                         if row < 4*32+1
-                            musical_features(row,col) = norm_rms(col);
+                            %musical_features(row,col) = norm_rms(col);
                         end
                     end
                end 
@@ -147,8 +158,8 @@ function customWriteImage(S,centroid,zerocrossingrate,spectral_entropy,root_mean
 
     rgb_img = zeros(256,256,3);
     rgb_img(:,:,1) = flip(logscaled(:,:,1));
-    rgb_img(:,:,2) = flip(logscaled(:,:,2));
-    rgb_img(:,:,3) = musical_features;
+    %rgb_img(:,:,2) = flip(logscaled(:,:,2));
+    %rgb_img(:,:,3) = musical_features;
     
     imwrite(rgb_img,filepath);
 end

@@ -13,8 +13,8 @@ genres
 
 
 [audioBG,FsBg] = audioread("E:\urbandsounds8k\downtown_traffic.wav");
-import_location = "E:\temp_location\mixed_test_audio\";
-training_export_location = "E:\temp_location\mixed_test_data_v2\";
+import_location = "E:\temp_location\mixed_train_audio\";
+training_export_location = "E:\temp_location\mixed_train_data_v3\";
 separator = '\';
 
 upper_freq_limit = 10000;

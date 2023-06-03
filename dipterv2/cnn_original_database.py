@@ -1,3 +1,4 @@
+import random
 import statistics
 
 import torch
@@ -14,21 +15,12 @@ import matplotlib.pyplot as plt
 
 from IPython.display import HTML, display
 
+torch.manual_seed(42)
+random.seed(42)
+
 start_time = time.time()
 train_times = []
 val_times = []
-
-
-def progress(value, max=100):
-    return HTML("""
-        <progress
-            value='{value}'
-            max='{max}',
-            style='width: 100%'
-        >
-            {value}
-        </progress>
-    """.format(value=value, max=max))
 
 
 print(torch.cuda.is_available())
@@ -66,7 +58,7 @@ class NETWORK2(nn.Module):
         self.flatten = nn.Flatten()
         self.pooling = nn.AdaptiveAvgPool2d(1)
         self.linear_layers = nn.Linear(128, 10)
-        self.last = nn.Sigmoid()
+        #self.last = nn.Softmax()
         # 1936
         # self.classifier = nn.Conv2d(15488, 9, kernel_size=1)
 
@@ -78,18 +70,13 @@ class NETWORK2(nn.Module):
         x = self.flatten(x)
         x = self.linear_layers(x)
         # x = self.classifier(x)
-        x = self.last(x)
+        #x = self.last(x)
         return x
 
 
 transform = transforms.Compose([
     transforms.ToTensor()
-    # transforms.CenterCrop([369, 375])
-    # ,
-    # transforms.Resize([256,256])
-    # transforms.RandomCrop([288,50])
-    # transforms.Normalize((0.49139968, 0.48215827, 0.44653124),
-    # (0.24703233, 0.24348505, 0.26158768))
+
 ])
 
 haveCuda = torch.cuda.is_available()
@@ -98,7 +85,7 @@ haveCuda = torch.cuda.is_available()
 print("Initialization took %.2f seconds." % (time.time() - start_time))
 
 
-def train(epoch):
+def train():
     # variables for loss
     running_loss = 0.0
     correct = 0.0
@@ -147,7 +134,7 @@ def train(epoch):
     return tr_loss, tr_corr
 
 
-def val(epoch):
+def val():
     # variables for loss
     running_loss = 0.0
     correct = 0.0
@@ -195,85 +182,74 @@ def val(epoch):
 torch.manual_seed(42)
 
 
-fold_results = []
 
-for fold_counter in range(1, 11):
-    net = NETWORK2()
-    print(net)
-    summary(net.cuda(), (3, 256, 256))
 
-    if haveCuda:
-        torch.cuda.manual_seed(42)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+net = NETWORK2()
+print(net)
+summary(net.cuda(), (3, 256, 256))
 
-    # numClass,nFeat,nLevels,layersPerLevel,kernelSize,nLinType,bNorm,residual=False):
-    if haveCuda:
-        net = net.cuda()
-    # Loss, and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
-                          nesterov=True, weight_decay=1e-4)
+if haveCuda:
+    torch.cuda.manual_seed(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    # Create LR cheduler
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, 10)
+# numClass,nFeat,nLevels,layersPerLevel,kernelSize,nLinType,bNorm,residual=False):
+if haveCuda:
+    net = net.cuda()
+# Loss, and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
+                      nesterov=True, weight_decay=1e-4)
 
-    # Epoch counter
-    numEpoch = 32
+# Create LR cheduler
+scheduler = lr_scheduler.CosineAnnealingLR(optimizer, 10)
 
-    trLosses = []
-    trAccs = []
-    valLosses = []
-    valAccs = []
-    best_loss = 10
-    best_train_acc = 0
-    best_val_acc = 0
+# Epoch counter
+numEpoch = 32
 
-    trainSet = torchvision.datasets.ImageFolder(
-        root="E:/temp_location/10fold_cross_val_datasets/" + str(fold_counter) + "/train/", transform=transform)
-    testSet = torchvision.datasets.ImageFolder(
-        root="E:/temp_location/10fold_cross_val_datasets/" + str(fold_counter) + "/test/", transform=transform)
-    trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=32, shuffle=True)
-    testLoader = torch.utils.data.DataLoader(testSet, batch_size=32, shuffle=False)
+trLosses = []
+trAccs = []
+valLosses = []
+valAccs = []
+best_loss = 10
+best_train_acc = 0
+best_val_acc = 0
 
-    print('Started fold ' + str(fold_counter))
+trainSet = torchvision.datasets.ImageFolder(
+    root="E:/temp_location/original_sets/base_spec_random_bgnoiseminus3db/train/", transform=transform)
+testSet = torchvision.datasets.ImageFolder(
+    root="E:/temp_location/original_sets/base_spec_random_bgnoiseminus3db/test/", transform=transform)
+trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=32, shuffle=True)
+testLoader = torch.utils.data.DataLoader(testSet, batch_size=32, shuffle=False)
 
-    for epoch in range(numEpoch):
-        # Call train and val
-        tr_loss, tr_corr = train(epoch)
-        val_loss, val_corr = val(epoch)
+for epoch in range(numEpoch):
+    # Call train and val
+    tr_loss, tr_corr = train()
+    val_loss, val_corr = val()
 
-        trLosses.append(tr_loss)
-        trAccs.append(tr_corr)
-        valLosses.append(val_loss)
-        valAccs.append(val_corr)
+    trLosses.append(tr_loss)
+    trAccs.append(tr_corr)
+    valLosses.append(val_loss)
+    valAccs.append(val_corr)
 
-        print("Epoch "+str(epoch+1)+" val acc: "+str(val_corr))
+    print("Epoch "+str(epoch+1)+" val acc: "+str(val_corr))
 
-        if val_loss < best_loss:
-            best_loss = val_loss
-            torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_"
-                       + str(datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
-        # Step with the scheduler
-        scheduler.step()
+    if val_loss < best_loss:
+        best_loss = val_loss
+        torch.save(net, "Z:/Egyetem/önlab2_msc/saved_models/model_"
+                   + str(datetime.datetime.now().strftime("%Y%m%d_%H%M")) + ".pth")
+    # Step with the scheduler
+    scheduler.step()
 
-    # Finished
-    print('Finished fold ' + str(fold_counter))
-    print("Best training accuracy: %.2f" % (best_train_acc))
-    print("Best validation accuracy: %.2f" % (best_val_acc))
-    print("Avg train time: %.2f" % (sum(train_times) / len(train_times)))
-    print("Avg val time  : %.2f" % (sum(val_times) / len(val_times)))
-    print("Total duration: %.2f" % (time.time() - start_time))
+# Finished
+print("Best training accuracy: %.2f" % (best_train_acc))
+print("Best validation accuracy: %.2f" % (best_val_acc))
+print("Avg train time: %.2f" % (sum(train_times) / len(train_times)))
+print("Avg val time  : %.2f" % (sum(val_times) / len(val_times)))
+print("Total duration: %.2f" % (time.time() - start_time))
 
-    fold_results.append(best_val_acc)
 
-    print("Average validation accuracy so far: " + str(statistics.mean(fold_results)))
-
-    net.eval()
-
-for i in range(0, 10):
-    print("Fold " + str(i) + " result: " + str(fold_results[i]))
-print("Finished training, average validation accuracy: " + str(statistics.mean(fold_results)))
+net.eval()
 
 conf = torch.zeros(10, 10)
 
